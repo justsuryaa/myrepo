@@ -13,7 +13,6 @@ INFERENCE_PROFILE_ARN = os.environ.get(
     "BEDROCK_INFERENCE_PROFILE_ARN",
     "arn:aws:bedrock:us-east-1:705241975254:inference-profile/us.anthropic.claude-3-5-haiku-20241022-v1:0"
 )
-
 # Clients
 s3 = boto3.client("s3", region_name=REGION)
 bedrock = boto3.client(
