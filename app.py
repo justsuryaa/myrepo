@@ -88,6 +88,7 @@ def query_bedrock(user_prompt: str, history: list) -> tuple:
         return history, f"Error: {e}"
 
 
+
 with gr.Blocks(theme=gr.themes.Base(), css="body {background: #1565c0;} .gradio-container {background: #1565c0;} .white-bg {background: #fff; border-radius: 10px; padding: 20px;}") as demo:
     gr.Markdown("<h1 style='color:white;text-align:center;'>THE OASIS PUBLIC SCHOOL</h1>")
     gr.Markdown("<h2 style='color:white;text-align:center;'>STUDENT'S ATTENDANCE DETAILS</h2>")
@@ -95,6 +96,7 @@ with gr.Blocks(theme=gr.themes.Base(), css="body {background: #1565c0;} .gradio-
         with gr.Column():
             chatbot = gr.Chatbot(label="Chat History", elem_classes=["white-bg"])
             input_box = gr.Textbox(lines=5, label="Ask about the S3 data", placeholder="e.g. What are the ways to improve attendance?", elem_classes=["white-bg"])
+            submit_btn = gr.Button("Submit", elem_classes=["white-bg"])
     gr.Markdown("<div style='color:white;text-align:center;'>Asks Anthropic Claude via Amazon Bedrock using a sample of JSON data from your S3 bucket.<br>Sample prompt: What are the ways to improve attendance?</div>")
 
     def chat(user_input, history=[]):
@@ -107,7 +109,7 @@ with gr.Blocks(theme=gr.themes.Base(), css="body {background: #1565c0;} .gradio-
         # Gradio expects history as list of [user, assistant] pairs
         return updated_history, ""
 
-    input_box.submit(chat, inputs=[input_box, chatbot], outputs=[chatbot, input_box])
+    submit_btn.click(chat, inputs=[input_box, chatbot], outputs=[chatbot, input_box])
 
 
 if __name__ == "__main__":
