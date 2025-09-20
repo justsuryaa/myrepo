@@ -62,14 +62,21 @@ def query_bedrock(user_prompt: str, history: list) -> tuple:
     # Build messages from history
     messages = []
     for user, assistant in history:
-        # Previous user and assistant turns
         messages.append({"role": "user", "content": [{"text": user}]})
         messages.append({"role": "assistant", "content": [{"text": assistant}]})
-    # Add the new user prompt, with S3 data sample
-    user_text = (
-        f"{user_prompt}\n\nHere is a sample of the combined S3 data:\n{sample_str}\n"
-        "Please analyze and answer clearly. If the sample is insufficient, say so."
-    )
+
+    # Detect if the question is about attendance or students
+    keywords = ["attendance", "student", "school", "absent", "present", "class", "roll", "register"]
+    if any(word in user_prompt.lower() for word in keywords):
+        # Add S3 data to prompt
+        user_text = (
+            f"{user_prompt}\n\nHere is a sample of the combined S3 data:\n{sample_str}\n"
+            "Please analyze and answer clearly. If the sample is insufficient, say so."
+        )
+    else:
+        # Generic question, no S3 data
+        user_text = user_prompt
+
     messages.append({"role": "user", "content": [{"text": user_text}]})
 
     try:
@@ -80,7 +87,6 @@ def query_bedrock(user_prompt: str, history: list) -> tuple:
         )
         out = resp.get("output", {}).get("message", {}).get("content", [])
         assistant_text = "".join(part.get("text", "") for part in out if "text" in part)
-        # Update history
         history.append((user_prompt, assistant_text or "(No text returned by model)"))
         return history, assistant_text or "(No text returned by model)"
     except Exception as e:
@@ -89,14 +95,14 @@ def query_bedrock(user_prompt: str, history: list) -> tuple:
 
 
 
-with gr.Blocks(theme=gr.themes.Base(), css="body {background: #1565c0;} .gradio-container {background: #1565c0;} .white-bg {background: #fff; border-radius: 10px; padding: 20px;}") as demo:
+with gr.Blocks(theme=gr.themes.Base(), css="body {background: #1565c0;} .gradio-container {background: #1565c0;} .white-bg {background: #fff; border-radius: 10px; padding: 20px;} .black-btn {color: #000 !important;}") as demo:
     gr.Markdown("<h1 style='color:white;text-align:center;'>THE OASIS PUBLIC SCHOOL</h1>")
     gr.Markdown("<h2 style='color:white;text-align:center;'>STUDENT'S ATTENDANCE DETAILS</h2>")
     with gr.Row():
         with gr.Column():
             chatbot = gr.Chatbot(label="Chat History", elem_classes=["white-bg"])
             input_box = gr.Textbox(lines=5, label="Ask about the S3 data", placeholder="e.g. What are the ways to improve attendance?", elem_classes=["white-bg"])
-            submit_btn = gr.Button("Submit", elem_classes=["white-bg"])
+            submit_btn = gr.Button("Submit", elem_classes=["white-bg", "black-btn"])
     gr.Markdown("<div style='color:white;text-align:center;'>Asks Anthropic Claude via Amazon Bedrock using a sample of JSON data from your S3 bucket.<br>Sample prompt: What are the ways to improve attendance?</div>")
 
     def chat(user_input, history=[]):
