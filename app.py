@@ -106,13 +106,12 @@ with gr.Blocks(theme=gr.themes.Base(), css="body {background: #1565c0;} .gradio-
     gr.Markdown("<div style='color:white;text-align:center;'>Asks Anthropic Claude via Amazon Bedrock using a sample of JSON data from your S3 bucket.<br>Sample prompt: What are the ways to improve attendance?</div>")
 
     def chat(user_input, history=[]):
-        # Gradio passes history as a list of [user, assistant] pairs
-        # Convert to list of tuples for our function
+        # Prevent sending empty input to Bedrock
+        if not user_input or not user_input.strip():
+            return history, ""
         history = history or []
-        # If history is list of lists, convert to tuples
         history = [tuple(pair) for pair in history]
         updated_history, assistant_text = query_bedrock(user_input, history)
-        # Gradio expects history as list of [user, assistant] pairs
         return updated_history, ""
 
     submit_btn.click(chat, inputs=[input_box, chatbot], outputs=[chatbot, input_box])
