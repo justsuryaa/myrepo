@@ -52,9 +52,9 @@ else:
     s3_data_str = json.dumps(all_data)
 
 def query_bedrock(user_prompt: str, history: list) -> tuple:
-    # Sample up to 100 records to control prompt size
+    # Sample up to 20 records to control prompt size and improve speed
     try:
-        sample = all_data[:100] if isinstance(all_data, list) else all_data
+        sample = all_data[:20] if isinstance(all_data, list) else all_data
         sample_str = json.dumps(sample)
     except Exception:
         sample_str = s3_data_str[:2000]
