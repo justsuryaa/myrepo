@@ -79,14 +79,18 @@ def query_bedrock(user_prompt: str) -> str:
     except Exception as e:
         return f"Error: {e}"
 
-iface = gr.Interface(
-    fn=query_bedrock,
-    inputs=gr.Textbox(lines=5, label="Ask about the S3 data"),
-    outputs=gr.Textbox(lines=15, label="output"),
-    title="Bedrock LLM Chat with S3 Data",
-    description="Asks Anthropic Claude via Amazon Bedrock using a sample of JSON data from your S3 bucket.",
-)
+with gr.Blocks(theme=gr.themes.Base(), css="body {background: #1565c0;} .gradio-container {background: #1565c0;} .white-bg {background: #fff; border-radius: 10px; padding: 20px;}") as demo:
+    gr.Markdown("<h1 style='color:white;text-align:center;'>THE OASIS PUBLIC SCHOOL</h1>")
+    gr.Markdown("<h2 style='color:white;text-align:center;'>STUDENT'S ATTENDANCE DETAILS</h2>")
+    with gr.Row():
+        with gr.Column():
+            input_box = gr.Textbox(lines=5, label="Ask about the S3 data", placeholder="e.g. What are the ways to improve attendance?", elem_classes=["white-bg"])
+        with gr.Column():
+            output_box = gr.Textbox(lines=15, label="output", elem_classes=["white-bg"])
+    gr.Markdown("<div style='color:white;text-align:center;'>Asks Anthropic Claude via Amazon Bedrock using a sample of JSON data from your S3 bucket.<br>Sample prompt: What are the ways to improve attendance?</div>")
+    input_box.submit(query_bedrock, inputs=input_box, outputs=output_box)
+
 
 if __name__ == "__main__":
-    iface.launch(show_error=True)
+    demo.launch(show_error=True)
 
