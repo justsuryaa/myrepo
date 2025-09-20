@@ -21,6 +21,8 @@ bedrock = boto3.client(
     config=botocore.config.Config(connect_timeout=10, read_timeout=120),
 )
 
+# Chat history will be managed per session in Gradio
+
 def list_json_files(bucket):
     paginator = s3.get_paginator("list_objects_v2")
     json_files = []
@@ -49,7 +51,7 @@ else:
             print(f"Could not load S3 data from {object_key}: {e}")
     s3_data_str = json.dumps(all_data)
 
-def query_bedrock(user_prompt: str) -> str:
+def query_bedrock(user_prompt: str, history: list) -> tuple:
     # Sample up to 100 records to control prompt size
     try:
         sample = all_data[:100] if isinstance(all_data, list) else all_data
@@ -57,38 +59,55 @@ def query_bedrock(user_prompt: str) -> str:
     except Exception:
         sample_str = s3_data_str[:2000]
 
+    # Build messages from history
+    messages = []
+    for user, assistant in history:
+        # Previous user and assistant turns
+        messages.append({"role": "user", "content": [{"text": user}]})
+        messages.append({"role": "assistant", "content": [{"text": assistant}]})
+    # Add the new user prompt, with S3 data sample
     user_text = (
         f"{user_prompt}\n\nHere is a sample of the combined S3 data:\n{sample_str}\n"
         "Please analyze and answer clearly. If the sample is insufficient, say so."
     )
-
-    # Converse API with inference profile
-    messages = [
-        {"role": "user", "content": [{"text": user_text}]}
-    ]
+    messages.append({"role": "user", "content": [{"text": user_text}]})
 
     try:
         resp = bedrock.converse(
-            modelId=INFERENCE_PROFILE_ARN,  # inference profile ARN or ID (e.g., us.anthropic.claude-3-5-haiku-20241022-v1:0)
+            modelId=INFERENCE_PROFILE_ARN,
             messages=messages,
             inferenceConfig={"maxTokens": 256, "temperature": 0.3, "topP": 0.9},
         )
         out = resp.get("output", {}).get("message", {}).get("content", [])
         assistant_text = "".join(part.get("text", "") for part in out if "text" in part)
-        return assistant_text or "(No text returned by model)"
+        # Update history
+        history.append((user_prompt, assistant_text or "(No text returned by model)"))
+        return history, assistant_text or "(No text returned by model)"
     except Exception as e:
-        return f"Error: {e}"
+        history.append((user_prompt, f"Error: {e}"))
+        return history, f"Error: {e}"
+
 
 with gr.Blocks(theme=gr.themes.Base(), css="body {background: #1565c0;} .gradio-container {background: #1565c0;} .white-bg {background: #fff; border-radius: 10px; padding: 20px;}") as demo:
     gr.Markdown("<h1 style='color:white;text-align:center;'>THE OASIS PUBLIC SCHOOL</h1>")
     gr.Markdown("<h2 style='color:white;text-align:center;'>STUDENT'S ATTENDANCE DETAILS</h2>")
     with gr.Row():
         with gr.Column():
+            chatbot = gr.Chatbot(label="Chat History", elem_classes=["white-bg"])
             input_box = gr.Textbox(lines=5, label="Ask about the S3 data", placeholder="e.g. What are the ways to improve attendance?", elem_classes=["white-bg"])
-        with gr.Column():
-            output_box = gr.Textbox(lines=15, label="output", elem_classes=["white-bg"])
     gr.Markdown("<div style='color:white;text-align:center;'>Asks Anthropic Claude via Amazon Bedrock using a sample of JSON data from your S3 bucket.<br>Sample prompt: What are the ways to improve attendance?</div>")
-    input_box.submit(query_bedrock, inputs=input_box, outputs=output_box)
+
+    def chat(user_input, history=[]):
+        # Gradio passes history as a list of [user, assistant] pairs
+        # Convert to list of tuples for our function
+        history = history or []
+        # If history is list of lists, convert to tuples
+        history = [tuple(pair) for pair in history]
+        updated_history, assistant_text = query_bedrock(user_input, history)
+        # Gradio expects history as list of [user, assistant] pairs
+        return updated_history, ""
+
+    input_box.submit(chat, inputs=[input_box, chatbot], outputs=[chatbot, input_box])
 
 
 if __name__ == "__main__":
