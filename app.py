@@ -51,13 +51,22 @@ else:
             print(f"Could not load S3 data from {object_key}: {e}")
     s3_data_str = json.dumps(all_data)
 
+# ...existing code...
+
 def query_bedrock(user_prompt: str, history: list) -> tuple:
-    # Sample up to 20 records to control prompt size and improve speed
-    try:
+    # Try to extract a student name from the prompt using a simple regex
+    import re
+    match = re.search(r"\b([A-Z][a-z]+)\b", user_prompt)
+    student_name = match.group(1) if match else None
+
+    # Filter data for the student if a name is found
+    if student_name:
+        filtered = [record for record in all_data if student_name.lower() in json.dumps(record).lower()]
+        sample = filtered[:20] if filtered else all_data[:20]
+    else:
         sample = all_data[:20] if isinstance(all_data, list) else all_data
-        sample_str = json.dumps(sample)
-    except Exception:
-        sample_str = s3_data_str[:2000]
+
+    sample_str = json.dumps(sample)
 
     # Build messages from history
     messages = []
@@ -119,4 +128,3 @@ with gr.Blocks(theme=gr.themes.Base(), css="body {background: #1565c0;} .gradio-
 
 if __name__ == "__main__":
     demo.launch(show_error=True)
-
