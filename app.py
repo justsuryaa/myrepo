@@ -53,20 +53,25 @@ else:
 
 # ...existing code...
 
+# ...existing code...
+
 def query_bedrock(user_prompt: str, history: list) -> tuple:
-    # Try to extract a student name from the prompt using a simple regex
     import re
     match = re.search(r"\b([A-Z][a-z]+)\b", user_prompt)
     student_name = match.group(1) if match else None
 
-    # Filter data for the student if a name is found
+    # Increase sample size to 50
+    SAMPLE_SIZE = 50
+
     if student_name:
         filtered = [record for record in all_data if student_name.lower() in json.dumps(record).lower()]
-        sample = filtered[:20] if filtered else all_data[:20]
+        sample = filtered[:SAMPLE_SIZE] if filtered else all_data[:SAMPLE_SIZE]
     else:
-        sample = all_data[:20] if isinstance(all_data, list) else all_data
+        sample = all_data[:SAMPLE_SIZE] if isinstance(all_data, list) else all_data
 
     sample_str = json.dumps(sample)
+
+    # ...rest of your function unchanged...
 
     # Build messages from history
     messages = []
