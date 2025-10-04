@@ -135,12 +135,10 @@ def chat_interface(user_input, history=None):
 demo = gr.Interface(
     fn=chat_interface,
     inputs=[
-        gr.Textbox(label="Ask about the S3 data", placeholder="e.g. What are the ways to improve attendance?"),
-        gr.State([])
+        gr.Textbox(label="Ask about the S3 data", placeholder="e.g. What are the ways to improve attendance?")
     ],
     outputs=[
-        gr.Chatbot(label="Chat History"),
-        gr.State()
+        gr.Chatbot(label="Chat History")
     ],
     title="THE OASIS PUBLIC SCHOOL - STUDENT'S ATTENDANCE DETAILS",
     description="Asks Anthropic Claude via Amazon Bedrock using a sample of JSON data from your S3 bucket."
