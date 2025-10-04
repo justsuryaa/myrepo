@@ -120,29 +120,29 @@ with gr.Blocks(theme=gr.themes.Base(), css="body {background: #1565c0;} .gradio-
     gr.Markdown("<div style='color:white;text-align:center;'>Asks Anthropic Claude via Amazon Bedrock using a sample of JSON data from your S3 bucket.<br>Sample prompt: What are the ways to improve attendance?</div>")
 
     def chat(user_input, history=None):
-    # Ensure history is a list of messages
-    if not isinstance(history, list):
-        history = []
-    # Convert Gradio messages to tuples for your logic
-    history_tuples = []
-    for msg in history:
-        if isinstance(msg, dict):
-            if msg.get("role") == "user":
-                user = msg.get("content", "")
-                assistant = ""
-            elif msg.get("role") == "assistant":
-                user = ""
-                assistant = msg.get("content", "")
-            else:
-                continue
-            history_tuples.append((user, assistant))
-    # Use cached S3 data, refresh every 10 minutes
-    all_data = get_cached_s3_data()
-    updated_history, assistant_text = query_bedrock(user_input, history_tuples, all_data)
-    # Append the new user and assistant messages in OpenAI format
-    history.append({"role": "user", "content": user_input})
-    history.append({"role": "assistant", "content": assistant_text})
-    return history, ""
+        # Ensure history is a list of messages
+        if not isinstance(history, list):
+            history = []
+        # Convert Gradio messages to tuples for your logic
+        history_tuples = []
+        for msg in history:
+            if isinstance(msg, dict):
+                if msg.get("role") == "user":
+                    user = msg.get("content", "")
+                    assistant = ""
+                elif msg.get("role") == "assistant":
+                    user = ""
+                    assistant = msg.get("content", "")
+                else:
+                    continue
+                history_tuples.append((user, assistant))
+        # Use cached S3 data, refresh every 10 minutes
+        all_data = get_cached_s3_data()
+        updated_history, assistant_text = query_bedrock(user_input, history_tuples, all_data)
+        # Append the new user and assistant messages in OpenAI format
+        history.append({"role": "user", "content": user_input})
+        history.append({"role": "assistant", "content": assistant_text})
+        return history, ""
 
     submit_btn.click(chat, inputs=[input_box, chatbot], outputs=[chatbot, input_box])
 
