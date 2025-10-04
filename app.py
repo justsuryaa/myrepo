@@ -112,7 +112,7 @@ with gr.Blocks(theme=gr.themes.Base(), css="body {background: #1565c0;} .gradio-
     gr.Markdown("<h2 style='color:white;text-align:center;'>STUDENT'S ATTENDANCE DETAILS</h2>")
     with gr.Row():
         with gr.Column():
-            chatbot = gr.Chatbot(label="Chat History", elem_classes=["white-bg"])
+            chatbot = gr.Chatbot(label="Chat History", value=[], type="messages", elem_classes=["white-bg"])
             input_box = gr.Textbox(lines=5, label="Ask about the S3 data", placeholder="e.g. What are the ways to improve attendance?", elem_classes=["white-bg"])
             submit_btn = gr.Button("Submit", elem_classes=["white-bg", "black-btn"])
     gr.Markdown("<div style='color:white;text-align:center;'>Asks Anthropic Claude via Amazon Bedrock using a sample of JSON data from your S3 bucket.<br>Sample prompt: What are the ways to improve attendance?</div>")
