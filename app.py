@@ -74,11 +74,11 @@ def query_bedrock(user_prompt: str, history: list, all_data) -> tuple:
     sample_str = json.dumps(sample)
 
     messages = []
-for user, assistant in history:
-    if user:
-        messages.append({"role": "user", "content": user})
-    if assistant:
-        messages.append({"role": "assistant", "content": assistant})
+    for user, assistant in history:
+        if user:
+            messages.append({"role": "user", "content": user})
+        if assistant:
+            messages.append({"role": "assistant", "content": assistant})
 
     keywords = ["attendance", "student", "school", "absent", "present", "class", "roll", "register"]
     if any(word in user_prompt.lower() for word in keywords):
