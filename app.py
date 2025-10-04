@@ -124,11 +124,12 @@ demo = gr.Interface(
     ],
     outputs=[
         gr.Chatbot(label="Chat History"),
-        gr.Textbox(visible=False)
+        gr.State()
     ],
     title="THE OASIS PUBLIC SCHOOL - STUDENT'S ATTENDANCE DETAILS",
     description="Asks Anthropic Claude via Amazon Bedrock using a sample of JSON data from your S3 bucket."
 )
+
 
 if __name__ == "__main__":
     demo.launch(show_error=True, share=True)
