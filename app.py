@@ -58,7 +58,7 @@ def get_cached_s3_data():
         _last_cache_time = now
     return _cached_data
 
-def query_bedrock(user_prompt: str, history: list, all_data) -> tuple:
+def query_bedrock(user_prompt: str, history: list, all_data) -> str:
     import re
     match = re.search(r"\b([A-Z][a-z]+)\b", user_prompt)
     student_name = match.group(1) if match else None
@@ -73,12 +73,8 @@ def query_bedrock(user_prompt: str, history: list, all_data) -> tuple:
 
     sample_str = json.dumps(sample)
 
-    messages = []
-    for user, assistant in history:
-        if user:
-            messages.append({"role": "user", "content": user})
-        if assistant:
-            messages.append({"role": "assistant", "content": assistant})
+    # Use history directly as OpenAI-style messages
+    messages = history.copy() if history else []
 
     keywords = ["attendance", "student", "school", "absent", "present", "class", "roll", "register"]
     if any(word in user_prompt.lower() for word in keywords):
@@ -99,34 +95,9 @@ def query_bedrock(user_prompt: str, history: list, all_data) -> tuple:
         )
         out = resp.get("output", {}).get("message", {}).get("content", [])
         assistant_text = "".join(part.get("text", "") for part in out if "text" in part)
-        history.append((user_prompt, assistant_text or "(No text returned by model)"))
-        return history, assistant_text or "(No text returned by model)"
+        return assistant_text or "(No text returned by model)"
     except Exception as e:
-        history.append((user_prompt, f"Error: {e}"))
-        return history, f"Error: {e}"
-
-def chat_interface(user_input, history=None):
-    if history is None or isinstance(history, bool):
-        history = []
-    # Convert Gradio messages (dicts) to tuples for query_bedrock
-    history_tuples = []
-    for msg in history:
-        if isinstance(msg, dict):
-            if msg.get("role") == "user":
-                user = msg.get("content", "")
-                assistant = ""
-            elif msg.get("role") == "assistant":
-                user = ""
-                assistant = msg.get("content", "")
-            else:
-                continue
-            history_tuples.append((user, assistant))
-    all_data = get_cached_s3_data()
-    updated_history, assistant_text = query_bedrock(user_input, history_tuples, all_data)
-    # Append the new user and assistant messages in OpenAI format
-    history.append({"role": "user", "content": user_input})
-    history.append({"role": "assistant", "content": assistant_text})
-    return history
+        return f"Error: {e}"
 
 with gr.Blocks() as demo:
     chatbot = gr.Chatbot(label="Chat History", value=[], type="messages")
@@ -136,21 +107,8 @@ with gr.Blocks() as demo:
     def chat(user_input, history):
         if history is None or isinstance(history, bool):
             history = []
-        # Convert Gradio messages (dicts) to tuples for query_bedrock
-        history_tuples = []
-        for msg in history:
-            if isinstance(msg, dict):
-                if msg.get("role") == "user":
-                    user = msg.get("content", "")
-                    assistant = ""
-                elif msg.get("role") == "assistant":
-                    user = ""
-                    assistant = msg.get("content", "")
-                else:
-                    continue
-                history_tuples.append((user, assistant))
         all_data = get_cached_s3_data()
-        updated_history, assistant_text = query_bedrock(user_input, history_tuples, all_data)
+        assistant_text = query_bedrock(user_input, history, all_data)
         # Append the new user and assistant messages in OpenAI format
         history.append({"role": "user", "content": user_input})
         history.append({"role": "assistant", "content": assistant_text})
