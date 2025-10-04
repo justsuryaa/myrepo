@@ -109,7 +109,7 @@ def query_bedrock(user_prompt: str, history: list, all_data) -> tuple:
 
 # ...existing code...
 
-def chat_interface(user_input, history):
+def chat_interface(user_input, history=None):
     if history is None or isinstance(history, bool):
         history = []
     # Convert Gradio messages (dicts) to tuples for query_bedrock
@@ -130,7 +130,7 @@ def chat_interface(user_input, history):
     # Append the new user and assistant messages in OpenAI format
     history.append({"role": "user", "content": user_input})
     history.append({"role": "assistant", "content": assistant_text})
-    return history, ""
+    return history
 
 demo = gr.Interface(
     fn=chat_interface,
