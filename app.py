@@ -1,9 +1,9 @@
-import os
+iimport os
 import json
 import boto3
 import botocore
-import gradio as gr
 import time
+from flask import Flask, request, render_template_string
 
 REGION = "us-east-1"
 bucket_name = os.environ.get("BUCKET_NAME", "suryaatrial3")
@@ -73,7 +73,6 @@ def query_bedrock(user_prompt: str, history: list, all_data) -> str:
 
     sample_str = json.dumps(sample)
 
-    # Use history directly as OpenAI-style messages
     messages = history.copy() if history else []
 
     keywords = ["attendance", "student", "school", "absent", "present", "class", "roll", "register"]
@@ -99,33 +98,11 @@ def query_bedrock(user_prompt: str, history: list, all_data) -> str:
     except Exception as e:
         return f"Error: {e}"
 
-with gr.Blocks() as demo:
-    chatbot = gr.Chatbot(label="Chat History", value=[], type="messages")
-    input_box = gr.Textbox(label="Ask about the S3 data", placeholder="e.g. What are the ways to improve attendance?")
-    submit_btn = gr.Button("Submit")
-
-    def chat(user_input, history):
-        if history is None or isinstance(history, bool):
-            history = []
-        all_data = get_cached_s3_data()
-        assistant_text = query_bedrock(user_input, history, all_data)
-        # Append the new user and assistant messages in OpenAI format
-        history.append({"role": "user", "content": user_input})
-        history.append({"role": "assistant", "content": assistant_text})
-        return history, ""
-
-    submit_btn.click(chat, inputs=[input_box, chatbot], outputs=[chatbot, input_box])
-
-if __name__ == "__main__":
-    demo.launch(show_error=True, share=True)
-
-from flask import Flask, request, render_template_string
-
 app = Flask(__name__)
 
+# Store history in session if you want persistent chat, here it's per request
 @app.route("/", methods=["GET", "POST"])
 def index():
-    global _cached_data
     history = []
     assistant_text = ""
     if request.method == "POST":
@@ -135,6 +112,7 @@ def index():
         history.append({"role": "user", "content": user_input})
         history.append({"role": "assistant", "content": assistant_text})
     return render_template_string("""
+        <h2>THE OASIS PUBLIC SCHOOL - STUDENT'S ATTENDANCE DETAILS</h2>
         <form method="post">
             <input name="user_input" placeholder="Ask about the S3 data">
             <input type="submit">
