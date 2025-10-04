@@ -105,10 +105,6 @@ def query_bedrock(user_prompt: str, history: list, all_data) -> tuple:
         history.append((user_prompt, f"Error: {e}"))
         return history, f"Error: {e}"
 
-# ...existing imports and setup...
-
-# ...existing code...
-
 def chat_interface(user_input, history=None):
     if history is None or isinstance(history, bool):
         history = []
@@ -132,18 +128,35 @@ def chat_interface(user_input, history=None):
     history.append({"role": "assistant", "content": assistant_text})
     return history
 
-demo = gr.Interface(
-    fn=chat_interface,
-    inputs=[
-        gr.Textbox(label="Ask about the S3 data", placeholder="e.g. What are the ways to improve attendance?")
-    ],
-    outputs=[
-        gr.Chatbot(label="Chat History")
-    ],
-    title="THE OASIS PUBLIC SCHOOL - STUDENT'S ATTENDANCE DETAILS",
-    description="Asks Anthropic Claude via Amazon Bedrock using a sample of JSON data from your S3 bucket."
-)
+with gr.Blocks() as demo:
+    chatbot = gr.Chatbot(label="Chat History", value=[], type="messages")
+    input_box = gr.Textbox(label="Ask about the S3 data", placeholder="e.g. What are the ways to improve attendance?")
+    submit_btn = gr.Button("Submit")
 
+    def chat(user_input, history):
+        if history is None or isinstance(history, bool):
+            history = []
+        # Convert Gradio messages (dicts) to tuples for query_bedrock
+        history_tuples = []
+        for msg in history:
+            if isinstance(msg, dict):
+                if msg.get("role") == "user":
+                    user = msg.get("content", "")
+                    assistant = ""
+                elif msg.get("role") == "assistant":
+                    user = ""
+                    assistant = msg.get("content", "")
+                else:
+                    continue
+                history_tuples.append((user, assistant))
+        all_data = get_cached_s3_data()
+        updated_history, assistant_text = query_bedrock(user_input, history_tuples, all_data)
+        # Append the new user and assistant messages in OpenAI format
+        history.append({"role": "user", "content": user_input})
+        history.append({"role": "assistant", "content": assistant_text})
+        return history, ""
+
+    submit_btn.click(chat, inputs=[input_box, chatbot], outputs=[chatbot, input_box])
 
 if __name__ == "__main__":
     demo.launch(show_error=True, share=True)
