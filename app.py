@@ -118,3 +118,29 @@ with gr.Blocks() as demo:
 
 if __name__ == "__main__":
     demo.launch(show_error=True, share=True)
+
+from flask import Flask, request, render_template_string
+
+app = Flask(__name__)
+
+@app.route("/", methods=["GET", "POST"])
+def index():
+    global _cached_data
+    history = []
+    assistant_text = ""
+    if request.method == "POST":
+        user_input = request.form["user_input"]
+        all_data = get_cached_s3_data()
+        assistant_text = query_bedrock(user_input, history, all_data)
+        history.append({"role": "user", "content": user_input})
+        history.append({"role": "assistant", "content": assistant_text})
+    return render_template_string("""
+        <form method="post">
+            <input name="user_input" placeholder="Ask about the S3 data">
+            <input type="submit">
+        </form>
+        <p>AI: {{assistant_text}}</p>
+    """, assistant_text=assistant_text)
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=7860)
