@@ -109,25 +109,26 @@ def query_bedrock(user_prompt: str, history: list, all_data) -> tuple:
 
 # ...existing code...
 
-with gr.Blocks(theme=gr.themes.Base(), css="body {background: #1565c0;} .gradio-container {background: #1565c0;} .white-bg {background: #fff; border-radius: 10px; padding: 20px;} .black-btn {color: #000 !important;}") as demo:
-    gr.Markdown("<h1 style='color:white;text-align:center;'>THE OASIS PUBLIC SCHOOL</h1>")
-    gr.Markdown("<h2 style='color:white;text-align:center;'>STUDENT'S ATTENDANCE DETAILS</h2>")
-    with gr.Row():
-        with gr.Column():
-            chatbot = gr.Chatbot(label="Chat History", value=[], elem_classes=["white-bg"])
-            input_box = gr.Textbox(lines=5, label="Ask about the S3 data", placeholder="e.g. What are the ways to improve attendance?", elem_classes=["white-bg"])
-            submit_btn = gr.Button("Submit", elem_classes=["white-bg", "black-btn"])
-    gr.Markdown("<div style='color:white;text-align:center;'>Asks Anthropic Claude via Amazon Bedrock using a sample of JSON data from your S3 bucket.<br>Sample prompt: What are the ways to improve attendance?</div>")
+def chat_interface(user_input, history):
+    if history is None:
+        history = []
+    all_data = get_cached_s3_data()
+    updated_history, assistant_text = query_bedrock(user_input, history, all_data)
+    return updated_history, ""
 
-    def chat(user_input, history=None):
-        if history is None:
-            history = []
-        # Use cached S3 data
-        all_data = get_cached_s3_data()
-        updated_history, assistant_text = query_bedrock(user_input, history, all_data)
-        return updated_history, ""
-
-    submit_btn.click(chat, inputs=[input_box, chatbot], outputs=[chatbot, input_box])
+demo = gr.Interface(
+    fn=chat_interface,
+    inputs=[
+        gr.Textbox(label="Ask about the S3 data", placeholder="e.g. What are the ways to improve attendance?"),
+        gr.State([])
+    ],
+    outputs=[
+        gr.Chatbot(label="Chat History"),
+        gr.Textbox(visible=False)
+    ],
+    title="THE OASIS PUBLIC SCHOOL - STUDENT'S ATTENDANCE DETAILS",
+    description="Asks Anthropic Claude via Amazon Bedrock using a sample of JSON data from your S3 bucket."
+)
 
 if __name__ == "__main__":
     demo.launch(show_error=True, share=True)
