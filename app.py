@@ -105,6 +105,8 @@ def query_bedrock(user_prompt: str, history: list, all_data) -> tuple:
 
 # ...existing imports and setup...
 
+# ...existing code...
+
 with gr.Blocks(theme=gr.themes.Base(), css="body {background: #1565c0;} .gradio-container {background: #1565c0;} .white-bg {background: #fff; border-radius: 10px; padding: 20px;} .black-btn {color: #000 !important;}") as demo:
     gr.Markdown("<h1 style='color:white;text-align:center;'>THE OASIS PUBLIC SCHOOL</h1>")
     gr.Markdown("<h2 style='color:white;text-align:center;'>STUDENT'S ATTENDANCE DETAILS</h2>")
@@ -121,7 +123,6 @@ with gr.Blocks(theme=gr.themes.Base(), css="body {background: #1565c0;} .gradio-
         if not isinstance(history, list):
             history = []
         history = [tuple(pair) for pair in history]
-        # Use cached S3 data, refresh every 10 minutes
         all_data = get_cached_s3_data()
         updated_history, assistant_text = query_bedrock(user_input, history, all_data)
         return updated_history, ""
@@ -130,4 +131,3 @@ with gr.Blocks(theme=gr.themes.Base(), css="body {background: #1565c0;} .gradio-
 
 if __name__ == "__main__":
     demo.launch(show_error=True, share=True)
-    
