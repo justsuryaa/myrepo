@@ -103,6 +103,8 @@ def query_bedrock(user_prompt: str, history: list, all_data) -> tuple:
         history.append((user_prompt, f"Error: {e}"))
         return history, f"Error: {e}"
 
+# ...existing imports and setup...
+
 with gr.Blocks(theme=gr.themes.Base(), css="body {background: #1565c0;} .gradio-container {background: #1565c0;} .white-bg {background: #fff; border-radius: 10px; padding: 20px;} .black-btn {color: #000 !important;}") as demo:
     gr.Markdown("<h1 style='color:white;text-align:center;'>THE OASIS PUBLIC SCHOOL</h1>")
     gr.Markdown("<h2 style='color:white;text-align:center;'>STUDENT'S ATTENDANCE DETAILS</h2>")
@@ -113,10 +115,11 @@ with gr.Blocks(theme=gr.themes.Base(), css="body {background: #1565c0;} .gradio-
             submit_btn = gr.Button("Submit", elem_classes=["white-bg", "black-btn"])
     gr.Markdown("<div style='color:white;text-align:center;'>Asks Anthropic Claude via Amazon Bedrock using a sample of JSON data from your S3 bucket.<br>Sample prompt: What are the ways to improve attendance?</div>")
 
-    def chat(user_input, history=[]):
+    def chat(user_input, history=None):
         if not user_input or not user_input.strip():
-            return history, ""
-        history = history or []
+            return history if isinstance(history, list) else [], ""
+        if not isinstance(history, list):
+            history = []
         history = [tuple(pair) for pair in history]
         # Use cached S3 data, refresh every 10 minutes
         all_data = get_cached_s3_data()
@@ -127,3 +130,4 @@ with gr.Blocks(theme=gr.themes.Base(), css="body {background: #1565c0;} .gradio-
 
 if __name__ == "__main__":
     demo.launch(show_error=True, share=True)
+    
