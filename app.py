@@ -18,7 +18,7 @@ s3 = boto3.client("s3", region_name=REGION)
 bedrock = boto3.client(
     "bedrock-runtime",
     region_name=REGION,
-    config=botocore.config.Config(connect_timeout=10, read_timeout=120),
+    config=botocore.config.Config(connect_timeout=5, read_timeout=30),
 )
 
 app = Flask(__name__)
