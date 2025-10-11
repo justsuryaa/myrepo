@@ -54,12 +54,12 @@ API_KEYS = {
 EXTERNAL_APIS = {
     "weather": {
         "base_url": "http://api.openweathermap.org/data/2.5/weather",
-        "api_key": os.environ.get("OPENWEATHER_API_KEY", "demo_key"),  # Get free key from openweathermap.org
+        "api_key": os.environ.get("OPENWEATHER_API_KEY", "YOUR_OPENWEATHER_API_KEY_HERE"),  # Get free key from openweathermap.org
         "enabled": True
     },
     "news": {
         "base_url": "https://newsapi.org/v2/top-headlines",
-        "api_key": os.environ.get("NEWS_API_KEY", "demo_key"),  # Get free key from newsapi.org
+        "api_key": os.environ.get("NEWS_API_KEY", "e5d7c39b653d47e585dc1232323e7d06"),  # Your News API key
         "enabled": True
     },
     "quotes": {
