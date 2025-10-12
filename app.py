@@ -52,24 +52,9 @@ API_KEYS = {
 
 # External API configurations
 EXTERNAL_APIS = {
-    "weather": {
-        "base_url": "http://api.openweathermap.org/data/2.5/weather",
-        "api_key": os.environ.get("OPENWEATHER_API_KEY", "YOUR_OPENWEATHER_API_KEY_HERE"),  # Get free key from openweathermap.org
-        "enabled": True
-    },
     "news": {
         "base_url": "https://newsapi.org/v2/top-headlines",
         "api_key": os.environ.get("NEWS_API_KEY", "e5d7c39b653d47e585dc1232323e7d06"),  # Your News API key
-        "enabled": True
-    },
-    "quotes": {
-        "base_url": "https://api.quotable.io/random",
-        "api_key": None,  # No key required
-        "enabled": True
-    },
-    "facts": {
-        "base_url": "https://uselessfacts.jsph.pl/random.json",
-        "api_key": None,  # No key required
         "enabled": True
     }
 }
@@ -191,7 +176,7 @@ def classify_query(user_query):
     """
     Determines whether the query is about:
     - S3 attendance data (internal)
-    - External API call (weather, news, etc.)
+    - News (external API)
     - General knowledge (use Bedrock only)
     """
     query_lower = user_query.lower()
@@ -203,25 +188,16 @@ def classify_query(user_query):
         "who is", "john", "sarah", "alex", "attendance rate", "missing"
     ]
     
-    # External API keywords
-    weather_keywords = ["weather", "temperature", "rain", "sunny", "cloudy", "forecast", "climate"]
-    news_keywords = ["news", "headlines", "current events", "today's news", "breaking news"]
-    quote_keywords = ["quote", "inspiration", "motivational", "wisdom", "saying"]
-    fact_keywords = ["fact", "random fact", "interesting", "did you know", "trivia"]
+    # News API keywords
+    news_keywords = ["news", "headlines", "current events", "today's news", "breaking news", "latest news"]
     
     # Check for S3 attendance queries
     if any(keyword in query_lower for keyword in attendance_keywords):
         return "s3_attendance"
     
-    # Check for external API queries
-    if any(keyword in query_lower for keyword in weather_keywords):
-        return "external_weather"
+    # Check for news queries
     elif any(keyword in query_lower for keyword in news_keywords):
         return "external_news"
-    elif any(keyword in query_lower for keyword in quote_keywords):
-        return "external_quotes"
-    elif any(keyword in query_lower for keyword in fact_keywords):
-        return "external_facts"
     
     # Default to general knowledge (Bedrock only)
     return "general"
@@ -229,42 +205,6 @@ def classify_query(user_query):
 # -----------------------
 # External API Functions
 # -----------------------
-def get_weather_data(query):
-    """Get weather information"""
-    try:
-        if not EXTERNAL_APIS["weather"]["enabled"]:
-            return {"error": "Weather service is currently disabled"}
-        
-        # Extract city name from query (simple approach)
-        city_match = re.search(r'weather in (\w+)', query.lower())
-        city = city_match.group(1) if city_match else "London"  # Default city
-        
-        api_key = EXTERNAL_APIS["weather"]["api_key"]
-        if api_key == "demo_key":
-            # Return demo data if no real API key
-            return {
-                "weather": f"Demo weather data for {city.title()}: 22°C, Partly Cloudy",
-                "note": "This is demo data. Set OPENWEATHER_API_KEY environment variable for real data."
-            }
-        
-        url = f"{EXTERNAL_APIS['weather']['base_url']}?q={city}&appid={api_key}&units=metric"
-        response = requests.get(url, timeout=10)
-        
-        if response.status_code == 200:
-            data = response.json()
-            weather_info = {
-                "city": data["name"],
-                "temperature": f"{data['main']['temp']}°C",
-                "description": data["weather"][0]["description"].title(),
-                "humidity": f"{data['main']['humidity']}%",
-                "feels_like": f"{data['main']['feels_like']}°C"
-            }
-            return {"weather": weather_info}
-        else:
-            return {"error": f"Weather API error: {response.status_code}"}
-    except Exception as e:
-        return {"error": f"Weather service error: {str(e)}"}
-
 def get_news_data():
     """Get latest news headlines"""
     try:
@@ -299,49 +239,6 @@ def get_news_data():
     except Exception as e:
         return {"error": f"News service error: {str(e)}"}
 
-def get_quote_data():
-    """Get inspirational quote"""
-    try:
-        if not EXTERNAL_APIS["quotes"]["enabled"]:
-            return {"error": "Quote service is currently disabled"}
-        
-        response = requests.get(EXTERNAL_APIS["quotes"]["base_url"], timeout=10)
-        
-        if response.status_code == 200:
-            data = response.json()
-            return {
-                "quote": {
-                    "text": data["content"],
-                    "author": data["author"],
-                    "tags": data.get("tags", [])
-                }
-            }
-        else:
-            return {"error": f"Quote API error: {response.status_code}"}
-    except Exception as e:
-        return {"error": f"Quote service error: {str(e)}"}
-
-def get_fact_data():
-    """Get random interesting fact"""
-    try:
-        if not EXTERNAL_APIS["facts"]["enabled"]:
-            return {"error": "Facts service is currently disabled"}
-        
-        response = requests.get(EXTERNAL_APIS["facts"]["base_url"], timeout=10)
-        
-        if response.status_code == 200:
-            data = response.json()
-            return {
-                "fact": {
-                    "text": data["text"],
-                    "source": data.get("source", "Unknown")
-                }
-            }
-        else:
-            return {"error": f"Facts API error: {response.status_code}"}
-    except Exception as e:
-        return {"error": f"Facts service error: {str(e)}"}
-
 # -----------------------
 # Hybrid Query Processing
 # -----------------------
@@ -357,18 +254,6 @@ def process_hybrid_query(user_query, history=None):
             # Use S3 data + Bedrock
             all_data = get_cached_s3_data()
             return query_bedrock(user_query, history or [], all_data)
-        
-        elif query_type == "external_weather":
-            # Get weather data
-            weather_data = get_weather_data(user_query)
-            if "error" in weather_data:
-                return f"Sorry, I couldn't get weather information: {weather_data['error']}"
-            
-            if "note" in weather_data:
-                return f"{weather_data['weather']}\n\nNote: {weather_data['note']}"
-            else:
-                weather_info = weather_data["weather"]
-                return f"🌤️ Weather in {weather_info['city']}: {weather_info['temperature']}, {weather_info['description']}. Feels like {weather_info['feels_like']}, Humidity: {weather_info['humidity']}"
         
         elif query_type == "external_news":
             # Get news data
@@ -389,24 +274,6 @@ def process_hybrid_query(user_query, history=None):
                     if article.get('description'):
                         response += f"  {article['description']}\n"
                 return response
-        
-        elif query_type == "external_quotes":
-            # Get quote data
-            quote_data = get_quote_data()
-            if "error" in quote_data:
-                return f"Sorry, I couldn't get a quote: {quote_data['error']}"
-            
-            quote_info = quote_data["quote"]
-            return f"💭 \"{quote_info['text']}\"\n\n— {quote_info['author']}"
-        
-        elif query_type == "external_facts":
-            # Get fact data
-            fact_data = get_fact_data()
-            if "error" in fact_data:
-                return f"Sorry, I couldn't get a fact: {fact_data['error']}"
-            
-            fact_info = fact_data["fact"]
-            return f"🔍 Did you know?\n\n{fact_info['text']}"
         
         else:  # general queries
             # Use Bedrock for general knowledge
@@ -565,8 +432,8 @@ def index():
             <div class="container">
                 <h2>🎓 SMART SCHOOL ASSISTANT - Attendance • Weather • News • More!</h2>
                 <form method="post" id="chatForm">
-                    <div class="sample-prompt">Try: "John's attendance" | "Weather in London" | "Latest news" | "Inspirational quote"</div>
-                    <input name="user_input" type="text" placeholder="Ask about attendance, weather, news, quotes, or anything!" required id="userInput">
+                    <div class="sample-prompt">Try: "John's attendance" | "Latest news" | "Tell me a joke"</div>
+                    <input name="user_input" type="text" placeholder="Ask about attendance, news, or anything!" required id="userInput">
                     <input type="submit" value="Submit" id="submitBtn">
                 </form>
                 <div class="loading-container" id="loadingContainer">
@@ -646,26 +513,20 @@ def api_info():
     return jsonify({
         "service": "School Attendance Chatbot API",
         "version": "2.0.0",
-        "description": "Hybrid API supporting both S3 attendance data and external APIs",
+        "description": "Simplified hybrid API supporting S3 attendance data and news",
         "capabilities": [
             "Student attendance queries",
-            "Weather information",
             "News headlines", 
-            "Inspirational quotes",
-            "Random facts",
             "General knowledge questions"
         ],
         "endpoints": {
             "POST /api/chat": "Main chat endpoint with hybrid intelligence",
             "GET /api/students": "List all students from attendance data",
-            "PUT /api/attendance": "Update attendance records",
-            "GET /api/weather": "Get weather information",
             "GET /api/news": "Get latest news headlines",
-            "GET /api/quote": "Get inspirational quote",
-            "GET /api/fact": "Get random fact"
+            "PUT /api/attendance": "Update attendance records"
         },
         "authentication": "API key required (Authorization header or api_key parameter)",
-        "demo_keys": ["sk-test-12345", "sk-prod-67890"]
+        "demo_keys": ["sk-test-12345", "sk-prod-67890", "sk-school-api-key"]
     })
 
 @app.route("/api/chat", methods=["POST"])
@@ -737,28 +598,6 @@ def api_students():
             "code": "FETCH_ERROR"
         }), 500
 
-@app.route("/api/weather", methods=["GET"])
-@require_api_key
-def api_weather():
-    """Get weather information"""
-    try:
-        city = request.args.get("city", "London")
-        weather_query = f"weather in {city}"
-        weather_data = get_weather_data(weather_query)
-        
-        return jsonify({
-            **weather_data,
-            "user": request.api_user["name"],
-            "timestamp": time.time()
-        })
-    
-    except Exception as e:
-        logger.error(f"API weather error: {e}")
-        return jsonify({
-            "error": f"Weather service error: {str(e)}",
-            "code": "WEATHER_ERROR"
-        }), 500
-
 @app.route("/api/news", methods=["GET"])
 @require_api_key
 def api_news():
@@ -777,46 +616,6 @@ def api_news():
         return jsonify({
             "error": f"News service error: {str(e)}",
             "code": "NEWS_ERROR"
-        }), 500
-
-@app.route("/api/quote", methods=["GET"])
-@require_api_key
-def api_quote():
-    """Get inspirational quote"""
-    try:
-        quote_data = get_quote_data()
-        
-        return jsonify({
-            **quote_data,
-            "user": request.api_user["name"],
-            "timestamp": time.time()
-        })
-    
-    except Exception as e:
-        logger.error(f"API quote error: {e}")
-        return jsonify({
-            "error": f"Quote service error: {str(e)}",
-            "code": "QUOTE_ERROR"
-        }), 500
-
-@app.route("/api/fact", methods=["GET"])
-@require_api_key
-def api_fact():
-    """Get random fact"""
-    try:
-        fact_data = get_fact_data()
-        
-        return jsonify({
-            **fact_data,
-            "user": request.api_user["name"],
-            "timestamp": time.time()
-        })
-    
-    except Exception as e:
-        logger.error(f"API fact error: {e}")
-        return jsonify({
-            "error": f"Fact service error: {str(e)}",
-            "code": "FACT_ERROR"
         }), 500
 
 @app.route("/api/attendance", methods=["PUT"])
