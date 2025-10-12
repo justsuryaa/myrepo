@@ -205,7 +205,7 @@ def classify_query(user_query):
 # -----------------------
 # External API Functions
 # -----------------------
-def get_news_data():
+def get_news_data(query=""):
     """Get latest news headlines"""
     try:
         if not EXTERNAL_APIS["news"]["enabled"]:
@@ -221,7 +221,14 @@ def get_news_data():
                 "note": "This is demo data. Set NEWS_API_KEY environment variable for real data."
             }
         
-        url = f"{EXTERNAL_APIS['news']['base_url']}?country=us&apiKey={api_key}&pageSize=5"
+        # Determine country based on query
+        country = "us"  # default
+        if any(city in query.lower() for city in ["chennai", "mumbai", "delhi", "bangalore", "india", "indian"]):
+            country = "in"
+        elif any(city in query.lower() for city in ["london", "uk", "britain", "british"]):
+            country = "gb"
+        
+        url = f"{EXTERNAL_APIS['news']['base_url']}?country={country}&apiKey={api_key}&pageSize=5"
         response = requests.get(url, timeout=10)
         
         if response.status_code == 200:
@@ -257,7 +264,7 @@ def process_hybrid_query(user_query, history=None):
         
         elif query_type == "external_news":
             # Get news data
-            news_data = get_news_data()
+            news_data = get_news_data(user_query)
             if "error" in news_data:
                 return f"Sorry, I couldn't get news information: {news_data['error']}"
             
@@ -603,7 +610,8 @@ def api_students():
 def api_news():
     """Get latest news headlines"""
     try:
-        news_data = get_news_data()
+        location = request.args.get("location", "")
+        news_data = get_news_data(location)
         
         return jsonify({
             **news_data,
