@@ -6,12 +6,15 @@ import time
 import logging
 import requests
 import re
+from datetime import datetime
 from functools import wraps
 from flask import Flask, request, render_template_string, session, jsonify
 from flask_cors import CORS
 
 REGION = "us-east-1"
 bucket_name = os.environ.get("BUCKET_NAME", "suryaatrial3")
+# New bucket for storing conversation logs
+conversation_bucket = os.environ.get("CONVERSATION_BUCKET", "promptstorage")
 
 INFERENCE_PROFILE_ARN = os.environ.get(
     "BEDROCK_INFERENCE_PROFILE_ARN",
@@ -38,6 +41,48 @@ logger = logging.getLogger(__name__)
 app.config['SESSION_COOKIE_SECURE'] = os.environ.get('FLASK_ENV') == 'production'
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+
+# -----------------------
+# Conversation Logging Functions
+# -----------------------
+def log_conversation_to_s3(query, response, query_type, user, api_key, response_time_ms, ip_address, user_agent=None, error_message=None):
+    """Log conversation to S3 bucket in JSON format"""
+    try:
+        conversation_id = f"conv_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}"
+        
+        conversation = {
+            "conversation_id": conversation_id,
+            "timestamp": datetime.now().isoformat(),
+            "user": user,
+            "api_key": api_key[:10] + "..." if api_key else None,  # Truncate for security
+            "query": query,
+            "query_type": query_type,
+            "response": response,
+            "response_length": len(response) if response else 0,
+            "response_time_ms": response_time_ms,
+            "ip_address": ip_address,
+            "user_agent": user_agent,
+            "success": error_message is None,
+            "error_message": error_message
+        }
+        
+        # Store in S3 with date-based folder structure
+        date_path = datetime.now().strftime('%Y/%m/%d')
+        key = f"conversations/{date_path}/{conversation_id}.json"
+        
+        s3.put_object(
+            Bucket=conversation_bucket,
+            Key=key,
+            Body=json.dumps(conversation, indent=2),
+            ContentType='application/json'
+        )
+        
+        logger.info(f"Conversation logged to S3: {conversation_id}")
+        
+    except Exception as e:
+        # Don't let logging errors break the main functionality
+        logger.error(f"Failed to log conversation to S3: {str(e)}")
+        pass
 
 # -----------------------
 # API Configuration
@@ -99,6 +144,85 @@ def health():
 def ping():
     """Additional health check endpoint"""
     return "pong", 200
+
+# -----------------------
+# Conversation Logging Functions
+# -----------------------
+def log_conversation_to_s3(query, response, query_type, user_name, api_key, response_time_ms=0):
+    """Log conversation data to S3 for analytics and monitoring"""
+    try:
+        conversation_id = f"conv_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}"
+        
+        conversation_data = {
+            "conversation_id": conversation_id,
+            "timestamp": datetime.now().isoformat(),
+            "user_name": user_name,
+            "api_key": api_key,
+            "query": query,
+            "query_type": query_type,
+            "response": response,
+            "response_length": len(response) if response else 0,
+            "response_time_ms": response_time_ms,
+            "ip_address": request.remote_addr if request else "unknown",
+            "user_agent": request.headers.get('User-Agent', 'unknown') if request else "unknown",
+            "success": True,
+            "error_message": None
+        }
+        
+        # Create S3 key with date-based folder structure
+        date_folder = datetime.now().strftime('%Y/%m/%d')
+        s3_key = f"conversations/{date_folder}/{conversation_id}.json"
+        
+        # Upload to S3
+        s3.put_object(
+            Bucket=conversation_bucket,
+            Key=s3_key,
+            Body=json.dumps(conversation_data, indent=2),
+            ContentType='application/json'
+        )
+        
+        logger.info(f"Conversation logged to S3: {s3_key}")
+        
+    except Exception as e:
+        logger.error(f"Failed to log conversation to S3: {e}")
+
+def log_error_to_s3(query, error_message, query_type, user_name, api_key):
+    """Log error conversations to S3"""
+    try:
+        conversation_id = f"error_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}"
+        
+        error_data = {
+            "conversation_id": conversation_id,
+            "timestamp": datetime.now().isoformat(),
+            "user_name": user_name,
+            "api_key": api_key,
+            "query": query,
+            "query_type": query_type,
+            "response": None,
+            "response_length": 0,
+            "response_time_ms": 0,
+            "ip_address": request.remote_addr if request else "unknown",
+            "user_agent": request.headers.get('User-Agent', 'unknown') if request else "unknown",
+            "success": False,
+            "error_message": str(error_message)
+        }
+        
+        # Create S3 key with date-based folder structure
+        date_folder = datetime.now().strftime('%Y/%m/%d')
+        s3_key = f"errors/{date_folder}/{conversation_id}.json"
+        
+        # Upload to S3
+        s3.put_object(
+            Bucket=conversation_bucket,
+            Key=s3_key,
+            Body=json.dumps(error_data, indent=2),
+            ContentType='application/json'
+        )
+        
+        logger.info(f"Error logged to S3: {s3_key}")
+        
+    except Exception as e:
+        logger.error(f"Failed to log error to S3: {e}")
 
 # -----------------------
 # S3 utility functions
@@ -542,31 +666,71 @@ def api_chat():
     """
     Main hybrid chat endpoint - handles both S3 data and external API queries
     """
+    start_time = time.time()
+    user_message = None
+    query_type = None
+    response = None
+    error_message = None
+    
     try:
         data = request.get_json()
         if not data or "message" not in data:
+            error_message = "Request must include 'message' field"
             return jsonify({
-                "error": "Request must include 'message' field",
+                "error": error_message,
                 "code": "MISSING_MESSAGE"
             }), 400
         
         user_message = data["message"]
         history = data.get("history", [])
         
-        # Process with hybrid system
+        # Classify and process with hybrid system
+        query_type = classify_query(user_message)
         response = process_hybrid_query(user_message, history)
+        
+        # Calculate response time
+        response_time_ms = int((time.time() - start_time) * 1000)
+        
+        # Log conversation to S3
+        log_conversation_to_s3(
+            query=user_message,
+            response=response,
+            query_type=query_type,
+            user=request.api_user["name"],
+            api_key=request.headers.get('Authorization', '').replace('Bearer ', ''),
+            response_time_ms=response_time_ms,
+            ip_address=request.remote_addr,
+            user_agent=request.headers.get('User-Agent'),
+            error_message=None
+        )
         
         return jsonify({
             "response": response,
-            "query_type": classify_query(user_message),
+            "query_type": query_type,
             "user": request.api_user["name"],
             "timestamp": time.time()
         })
     
     except Exception as e:
+        error_message = str(e)
+        response_time_ms = int((time.time() - start_time) * 1000)
+        
+        # Log error conversation to S3
+        log_conversation_to_s3(
+            query=user_message or "Unknown",
+            response=None,
+            query_type=query_type or "error",
+            user=request.api_user.get("name", "Unknown") if hasattr(request, 'api_user') else "Unknown",
+            api_key=request.headers.get('Authorization', '').replace('Bearer ', ''),
+            response_time_ms=response_time_ms,
+            ip_address=request.remote_addr,
+            user_agent=request.headers.get('User-Agent'),
+            error_message=error_message
+        )
+        
         logger.error(f"API chat error: {e}")
         return jsonify({
-            "error": f"Internal server error: {str(e)}",
+            "error": f"Internal server error: {error_message}",
             "code": "INTERNAL_ERROR"
         }), 500
 
@@ -660,7 +824,94 @@ def api_update_attendance():
             "code": "UPDATE_ERROR"
         }), 500
 
+@app.route("/api/conversations", methods=["GET"])
+@require_api_key
+def api_conversations():
+    """Get conversation logs from S3"""
+    try:
+        # Get query parameters
+        date = request.args.get('date', datetime.now().strftime('%Y/%m/%d'))
+        limit = int(request.args.get('limit', 50))
+        
+        # List objects in S3 for the specified date
+        prefix = f"conversations/{date}/"
+        
+        try:
+            response = s3.list_objects_v2(
+                Bucket=conversation_bucket,
+                Prefix=prefix,
+                MaxKeys=limit
+            )
+        except Exception as e:
+            if "NoSuchBucket" in str(e):
+                return jsonify({
+                    "error": f"Conversation bucket '{conversation_bucket}' does not exist. Please create it first.",
+                    "code": "BUCKET_NOT_FOUND",
+                    "conversations": [],
+                    "count": 0
+                }), 404
+            raise e
+        
+        conversations = []
+        
+        if 'Contents' in response:
+            for obj in response['Contents']:
+                try:
+                    # Get the conversation file
+                    file_response = s3.get_object(
+                        Bucket=conversation_bucket,
+                        Key=obj['Key']
+                    )
+                    conversation_data = json.loads(file_response['Body'].read().decode('utf-8'))
+                    conversations.append(conversation_data)
+                except Exception as e:
+                    logger.error(f"Error reading conversation file {obj['Key']}: {e}")
+                    continue
+        
+        # Sort by timestamp (newest first)
+        conversations.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
+        
+        return jsonify({
+            "conversations": conversations,
+            "count": len(conversations),
+            "date": date,
+            "bucket": conversation_bucket,
+            "user": request.api_user["name"],
+            "timestamp": time.time()
+        })
+    
+    except Exception as e:
+        logger.error(f"API conversations error: {e}")
+        return jsonify({
+            "error": f"Error fetching conversations: {str(e)}",
+            "code": "FETCH_ERROR"
+        }), 500
+
+# -----------------------
+# S3 Bucket Creation (Run once)
+# -----------------------
+def create_conversation_bucket():
+    """Create the S3 bucket for storing conversations if it doesn't exist"""
+    try:
+        s3.head_bucket(Bucket=conversation_bucket)
+        print(f"Bucket '{conversation_bucket}' already exists.")
+    except:
+        try:
+            if REGION == 'us-east-1':
+                s3.create_bucket(Bucket=conversation_bucket)
+            else:
+                s3.create_bucket(
+                    Bucket=conversation_bucket,
+                    CreateBucketConfiguration={'LocationConstraint': REGION}
+                )
+            print(f"Created bucket '{conversation_bucket}' successfully!")
+        except Exception as e:
+            print(f"Error creating bucket '{conversation_bucket}': {e}")
+
 # Starts the web server when this file is run directly (not imported)
 if __name__ == "__main__":
+    # Create conversation bucket if it doesn't exist
+    create_conversation_bucket()
+    
     port = int(os.environ.get("PORT", 7860))
     app.run(host="0.0.0.0", port=port, debug=False)
