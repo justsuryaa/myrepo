@@ -596,9 +596,10 @@ def index():
             <div class="container">
                 <h2>🎓 SMART SCHOOL ASSISTANT - Attendance</h2>
                 
-                <!-- Always show feedback button for testing -->
-                <div class="feedback-prompt">
-                    <button class="feedback-btn" onclick="showFeedbackModal()" style="margin: 10px 0; padding: 8px 15px; background: #4CAF50; color: white; border: none; border-radius: 5px; cursor: pointer;">⭐ Rate My Response</button>
+                <!-- GUARANTEED VISIBLE FEEDBACK BUTTON -->
+                <div style="background: #e7f3ff; padding: 15px; border-radius: 8px; margin: 20px 0; text-align: center;">
+                    <button onclick="showFeedbackModal()" style="background: #4CAF50; color: white; border: none; padding: 15px 30px; font-size: 18px; border-radius: 8px; cursor: pointer; width: 100%; max-width: 400px;">⭐ RATE MY RESPONSE (ALWAYS VISIBLE)</button>
+                    <div style="margin-top: 10px; font-size: 14px; color: #666;">Click above to rate the AI's response quality</div>
                 </div>
                 
                 {% if should_ask_feedback %}
