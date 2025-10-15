@@ -619,6 +619,11 @@ def index():
             <div class="container">
                 <h2>🎓 SMART SCHOOL ASSISTANT - Attendance • Weather • News • More!</h2>
                 
+                <!-- Always show feedback button for testing -->
+                <div class="feedback-prompt">
+                    <button class="feedback-btn" onclick="showFeedbackModal()" style="margin: 10px 0; padding: 8px 15px; background: #4CAF50; color: white; border: none; border-radius: 5px; cursor: pointer;">⭐ Rate My Response</button>
+                </div>
+                
                 {% if should_ask_feedback %}
                 <div class="feedback-prompt">
                     <strong>💭 Quick Feedback:</strong> {{ feedback_prompt }}
