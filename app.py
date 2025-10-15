@@ -12,10 +12,7 @@ from flask import Flask, request, render_template_string, session, jsonify
 from flask_cors import CORS
 
 # Import our database systems
-from user_database import UserInteractionDB
-from feedback_system import FeedbackTrainingSystem
-from enhanced_feedback_system import EnhancedFeedbackSystem
-from feedback_analytics_dashboard import add_analytics_to_app
+from ultra_simple_bedrock import SimpleBedrock
 
 REGION = "us-east-1"
 bucket_name = os.environ.get("BUCKET_NAME", "suryaatrial3")
@@ -44,9 +41,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Initialize database systems
-user_db = UserInteractionDB("user_interactions.json")
-feedback_system = FeedbackTrainingSystem("school_feedback.db")
-enhanced_feedback = EnhancedFeedbackSystem("enhanced_feedback.db")
+feedback_system = SimpleBedrock("school_feedback.db")
 
 # Production configurations
 app.config['SESSION_COOKIE_SECURE'] = os.environ.get('FLASK_ENV') == 'production'
@@ -421,16 +416,7 @@ def process_hybrid_query(user_query, history=None):
             # Use Bedrock for general knowledge
             response = query_bedrock(user_query, history or [], [])
         
-        # Log the interaction for feedback collection
-        response_time = int((time.time() - start_time) * 1000)  # Convert to milliseconds
-        interaction_id = feedback_system.log_interaction(
-            user_question=user_query,
-            ai_response=response,
-            query_type=query_type,
-            response_time_ms=response_time,
-            user_ip=request.remote_addr if request else None,
-            session_id=session.get('session_id') if 'session' in globals() else None
-        )
+        # Interaction logging simplified - feedback will be collected via modal
         
         return response
     
@@ -438,15 +424,7 @@ def process_hybrid_query(user_query, history=None):
         logger.error(f"Error in process_hybrid_query: {e}")
         error_response = f"Sorry, I encountered an error processing your request: {str(e)}"
         
-        # Log error interactions too
-        response_time = int((time.time() - start_time) * 1000)
-        feedback_system.log_interaction(
-            user_question=user_query,
-            ai_response=error_response,
-            query_type="error",
-            response_time_ms=response_time,
-            user_ip=request.remote_addr if request else None
-        )
+        # Error logging simplified
         
         return error_response
 
@@ -559,10 +537,9 @@ def index():
             else:
                 chat_history_html += f'<div class="ai-msg"><b>AI:</b> {msg["content"]}</div>'
         
-        # Check if we should ask for feedback
-        should_ask_feedback, feedback_prompt = enhanced_feedback.should_request_feedback(
-            session_id=session.get('session_id', 'anonymous')
-        )
+        # Check if we should ask for feedback (simplified version)
+        should_ask_feedback = len(session.get("history", [])) >= 4  # Ask after 2 exchanges
+        feedback_prompt = "How helpful was my previous response?"
         
         return render_template_string("""
         <!DOCTYPE html>
@@ -1099,21 +1076,12 @@ def submit_feedback():
         if not rating or rating < 1 or rating > 5:
             return jsonify({"success": False, "error": "Valid rating (1-5) required"}), 400
         
-        # Get the most recent interaction for this session
-        # In a real implementation, you'd track interaction IDs more precisely
-        interaction_id = enhanced_feedback.log_interaction(
-            user_question="Previous interaction feedback",
-            ai_response="Feedback collection",
-            query_type="feedback",
-            session_id=session_id
-        )
-        
-        # Submit feedback
-        feedback_id = enhanced_feedback.collect_feedback(
-            interaction_id=interaction_id,
-            overall_rating=rating,
-            feedback_text=feedback_text,
-            user_ip=request.remote_addr
+        # Submit feedback using simplified system
+        feedback_id = feedback_system.add_feedback(
+            user_question="Previous interaction",
+            ai_response="Generated response", 
+            rating=rating,
+            feedback_text=feedback_text
         )
         
         return jsonify({
@@ -1147,8 +1115,7 @@ def create_conversation_bucket():
         except Exception as e:
             print(f"Error creating bucket '{conversation_bucket}': {e}")
 
-# Initialize analytics dashboard
-add_analytics_to_app(app, enhanced_feedback)
+# Analytics dashboard not available in simplified version
 
 # Starts the web server when this file is run directly (not imported)
 if __name__ == "__main__":
