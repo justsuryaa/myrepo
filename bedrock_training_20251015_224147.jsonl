@@ -1,0 +1,3 @@
+{"messages": [{"role": "user", "content": "What is attendance?"}, {"role": "assistant", "content": "85% this month"}], "metadata": {"rating": 5, "quality": "high"}}
+{"messages": [{"role": "user", "content": "Tell joke"}, {"role": "assistant", "content": "Need better jokes"}], "metadata": {"rating": 3, "quality": "improved", "original_response": "Why did chicken cross road?"}}
+{"messages": [{"role": "user", "content": "Show news"}, {"role": "assistant", "content": "Connect to real news API"}], "metadata": {"rating": 2, "quality": "improved", "original_response": "Cannot access news"}}
