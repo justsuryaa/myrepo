@@ -1,0 +1,38 @@
+[
+  {
+    "question": "How do I reset my password?",
+    "ideal_answer": "Should provide actual password reset instructions or links",
+    "actual_answer": "I don't have access to password reset functionality.",
+    "feedback_score": 1.0,
+    "category": "technical_support",
+    "difficulty": "easy",
+    "quality_score": 0.8
+  },
+  {
+    "question": "How do I reset my password?",
+    "ideal_answer": "Should provide actual password reset instructions or links",
+    "actual_answer": "I don't have access to password reset functionality.",
+    "feedback_score": 1.0,
+    "category": "technical_support",
+    "difficulty": "medium",
+    "quality_score": 0.8
+  },
+  {
+    "question": "Show me the latest news",
+    "ideal_answer": "Should connect to a real news API and show headlines",
+    "actual_answer": "I'm unable to fetch news at the moment. Please try again later.",
+    "feedback_score": 2.0,
+    "category": "news",
+    "difficulty": "easy",
+    "quality_score": 0.6
+  },
+  {
+    "question": "Show me the latest news",
+    "ideal_answer": "Should connect to a real news API and show headlines",
+    "actual_answer": "I'm unable to fetch news at the moment. Please try again later.",
+    "feedback_score": 2.0,
+    "category": "news",
+    "difficulty": "medium",
+    "quality_score": 0.6
+  }
+]

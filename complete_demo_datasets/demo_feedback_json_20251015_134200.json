@@ -1,0 +1,137 @@
+{
+  "metadata": {
+    "created_at": "2025-10-15T13:42:00.537546",
+    "total_records": 5,
+    "version": "1.0",
+    "format": "user_prompt_database"
+  },
+  "categories": {
+    "attendance": {
+      "total_prompts": 1,
+      "average_rating": 5.0,
+      "rated_prompts": 1
+    },
+    "news": {
+      "total_prompts": 1,
+      "average_rating": 2.0,
+      "rated_prompts": 1
+    },
+    "grades": {
+      "total_prompts": 1,
+      "average_rating": 4.0,
+      "rated_prompts": 1
+    },
+    "entertainment": {
+      "total_prompts": 1,
+      "average_rating": 3.0,
+      "rated_prompts": 1
+    },
+    "technical_support": {
+      "total_prompts": 1,
+      "average_rating": 1.0,
+      "rated_prompts": 1
+    }
+  },
+  "prompts": [
+    {
+      "id": "b89fa443-ad9c-4d83-b0b0-d566cd3d9d7d",
+      "timestamp": "2025-10-15T13:42:00.534381",
+      "user_prompt": "What is John's attendance rate?",
+      "ai_response": "John has 85% attendance this month with 17 out of 20 days present.",
+      "category": "attendance",
+      "metadata": {
+        "sentiment": "neutral",
+        "complexity_score": 0.5,
+        "response_time_ms": 1000,
+        "confidence_score": 0.9,
+        "data_sources": [
+          "attendance_data"
+        ]
+      },
+      "feedback": {
+        "user_rating": 5,
+        "feedback_text": "Perfect answer!"
+      }
+    },
+    {
+      "id": "55d14da3-bd4a-44e1-a97b-16d44bab011b",
+      "timestamp": "2025-10-15T13:42:00.534392",
+      "user_prompt": "Show me the latest news",
+      "ai_response": "I'm unable to fetch news at the moment. Please try again later.",
+      "category": "news",
+      "metadata": {
+        "sentiment": "neutral",
+        "complexity_score": 0.5,
+        "response_time_ms": 1200,
+        "confidence_score": 0.2,
+        "data_sources": [
+          "news_data"
+        ]
+      },
+      "feedback": {
+        "user_rating": 2,
+        "feedback_text": "Doesn't work at all"
+      }
+    },
+    {
+      "id": "cd8a740e-b29c-4c7e-8ba8-df431ad32b28",
+      "timestamp": "2025-10-15T13:42:00.534395",
+      "user_prompt": "What's Sarah's grade average?",
+      "ai_response": "Sarah has a B+ average with 87% across all subjects.",
+      "category": "grades",
+      "metadata": {
+        "sentiment": "neutral",
+        "complexity_score": 0.5,
+        "response_time_ms": 1400,
+        "confidence_score": 0.8,
+        "data_sources": [
+          "grades_data"
+        ]
+      },
+      "feedback": {
+        "user_rating": 4,
+        "feedback_text": "Good but could show more details"
+      }
+    },
+    {
+      "id": "ee521300-1ce1-453a-97c0-1d92b03634a1",
+      "timestamp": "2025-10-15T13:42:00.534398",
+      "user_prompt": "Tell me a joke",
+      "ai_response": "Why did the math book look so sad? Because it had too many problems!",
+      "category": "entertainment",
+      "metadata": {
+        "sentiment": "neutral",
+        "complexity_score": 0.5,
+        "response_time_ms": 1600,
+        "confidence_score": 0.6,
+        "data_sources": [
+          "entertainment_data"
+        ]
+      },
+      "feedback": {
+        "user_rating": 3,
+        "feedback_text": "Okay joke but not very funny"
+      }
+    },
+    {
+      "id": "64ef2a0d-c737-40bb-bcda-9082aa413021",
+      "timestamp": "2025-10-15T13:42:00.534400",
+      "user_prompt": "How do I reset my password?",
+      "ai_response": "I don't have access to password reset functionality.",
+      "category": "technical_support",
+      "metadata": {
+        "sentiment": "neutral",
+        "complexity_score": 0.5,
+        "response_time_ms": 1800,
+        "confidence_score": 0.1,
+        "data_sources": [
+          "technical_support_data"
+        ]
+      },
+      "feedback": {
+        "user_rating": 1,
+        "feedback_text": "Completely useless"
+      }
+    }
+  ]
+}

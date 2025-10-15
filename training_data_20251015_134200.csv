@@ -1,0 +1,5 @@
+question,ideal_answer,actual_answer,feedback_score,category,difficulty,quality_score,needs_improvement
+How do I reset my password?,Should provide actual password reset instructions or links,I don't have access to password reset functionality.,1.0,technical_support,easy,0.8,True
+How do I reset my password?,Should provide actual password reset instructions or links,I don't have access to password reset functionality.,1.0,technical_support,medium,0.8,True
+Show me the latest news,Should connect to a real news API and show headlines,I'm unable to fetch news at the moment. Please try again later.,2.0,news,easy,0.6,True
+Show me the latest news,Should connect to a real news API and show headlines,I'm unable to fetch news at the moment. Please try again later.,2.0,news,medium,0.6,True

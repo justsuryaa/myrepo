@@ -11,6 +11,12 @@ from functools import wraps
 from flask import Flask, request, render_template_string, session, jsonify
 from flask_cors import CORS
 
+# Import our database systems
+from user_database import UserInteractionDB
+from feedback_system import FeedbackTrainingSystem
+from enhanced_feedback_system import EnhancedFeedbackSystem
+from feedback_analytics_dashboard import add_analytics_to_app
+
 REGION = "us-east-1"
 bucket_name = os.environ.get("BUCKET_NAME", "suryaatrial3")
 # New bucket for storing conversation logs
@@ -36,6 +42,11 @@ CORS(app)
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Initialize database systems
+user_db = UserInteractionDB("user_interactions.json")
+feedback_system = FeedbackTrainingSystem("school_feedback.db")
+enhanced_feedback = EnhancedFeedbackSystem("enhanced_feedback.db")
 
 # Production configurations
 app.config['SESSION_COOKIE_SECURE'] = os.environ.get('FLASK_ENV') == 'production'
@@ -377,42 +388,67 @@ def process_hybrid_query(user_query, history=None):
     """
     Main function that routes queries to appropriate data sources
     """
+    start_time = time.time()
     query_type = classify_query(user_query)
     logger.info(f"Query classified as: {query_type}")
     
     try:
+        response = ""
+        
         if query_type == "s3_attendance":
             # Use S3 data + Bedrock
             all_data = get_cached_s3_data()
-            return query_bedrock(user_query, history or [], all_data)
+            response = query_bedrock(user_query, history or [], all_data)
         
         elif query_type == "external_news":
             # Get news data
-            news_data = get_news_data(user_query)
+            news_data = get_news_data()
             if "error" in news_data:
-                return f"Sorry, I couldn't get news information: {news_data['error']}"
-            
-            if "note" in news_data:
+                response = f"Sorry, I couldn't get news information: {news_data['error']}"
+            elif "note" in news_data:
                 response = "📰 Latest News Headlines:\n\n"
                 for article in news_data["news"]:
                     response += f"• {article['title']} - {article['source']}\n"
                 response += f"\nNote: {news_data['note']}"
-                return response
             else:
                 response = "📰 Latest News Headlines:\n\n"
                 for article in news_data["news"]:
                     response += f"• {article['title']} - {article['source']}\n"
                     if article.get('description'):
                         response += f"  {article['description']}\n"
-                return response
         
         else:  # general queries
             # Use Bedrock for general knowledge
-            return query_bedrock(user_query, history or [], [])
+            response = query_bedrock(user_query, history or [], [])
+        
+        # Log the interaction for feedback collection
+        response_time = int((time.time() - start_time) * 1000)  # Convert to milliseconds
+        interaction_id = feedback_system.log_interaction(
+            user_question=user_query,
+            ai_response=response,
+            query_type=query_type,
+            response_time_ms=response_time,
+            user_ip=request.remote_addr if request else None,
+            session_id=session.get('session_id') if 'session' in globals() else None
+        )
+        
+        return response
     
     except Exception as e:
         logger.error(f"Error in process_hybrid_query: {e}")
-        return f"Sorry, I encountered an error processing your request: {str(e)}"
+        error_response = f"Sorry, I encountered an error processing your request: {str(e)}"
+        
+        # Log error interactions too
+        response_time = int((time.time() - start_time) * 1000)
+        feedback_system.log_interaction(
+            user_question=user_query,
+            ai_response=error_response,
+            query_type="error",
+            response_time_ms=response_time,
+            user_ip=request.remote_addr if request else None
+        )
+        
+        return error_response
 
 # -----------------------
 # Summarize and query
@@ -523,6 +559,11 @@ def index():
             else:
                 chat_history_html += f'<div class="ai-msg"><b>AI:</b> {msg["content"]}</div>'
         
+        # Check if we should ask for feedback
+        should_ask_feedback, feedback_prompt = enhanced_feedback.should_request_feedback(
+            session_id=session.get('session_id', 'anonymous')
+        )
+        
         return render_template_string("""
         <!DOCTYPE html>
         <html lang="en">
@@ -539,6 +580,18 @@ def index():
             input[type="submit"]:hover { background: #0d47a1; }
             input[type="submit"]:disabled { background: #ccc; cursor: not-allowed; }
             
+            /* Feedback Modal Styles */
+            .feedback-modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); }
+            .feedback-content { background-color: #fff; margin: 10% auto; padding: 20px; border-radius: 10px; width: 90%; max-width: 500px; color: #1565c0; }
+            .close { color: #aaa; float: right; font-size: 28px; font-weight: bold; cursor: pointer; }
+            .close:hover { color: #000; }
+            .rating-stars { font-size: 2em; margin: 15px 0; text-align: center; }
+            .star { color: #ddd; cursor: pointer; transition: color 0.2s; }
+            .star:hover, .star.selected { color: #ffd700; }
+            .feedback-textarea { width: 100%; min-height: 80px; padding: 10px; border: 1px solid #ddd; border-radius: 5px; margin: 10px 0; }
+            .feedback-submit { background: #27ae60; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; }
+            .feedback-skip { background: #95a5a6; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; margin-left: 10px; }
+            
             /* Loading Spinner Styles */
             .loading-container { text-align: center; margin: 15px 0; display: none; }
             .spinner { border: 3px solid #e3f2fd; border-top: 3px solid #1565c0; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; display: inline-block; margin-right: 10px; }
@@ -551,17 +604,28 @@ def index():
             .sample-prompt { color: #1565c0; font-size: 0.9em; margin-bottom: 10px; }
             .error-msg { background: #ffebee; color: #c62828; padding: 10px; border-radius: 5px; margin: 10px 0; border-left: 4px solid #c62828; }
             .success-msg { background: #e8f5e8; color: #2e7d32; padding: 10px; border-radius: 5px; margin: 10px 0; border-left: 4px solid #2e7d32; }
+            .feedback-prompt { background: #fff3cd; color: #856404; padding: 15px; border-radius: 8px; margin: 15px 0; border-left: 4px solid #ffc107; }
+            .feedback-btn { background: #ffc107; color: #212529; border: none; padding: 8px 16px; border-radius: 5px; cursor: pointer; margin-left: 10px; }
             @media (max-width: 600px) {
                 .container { margin: 10px; padding: 15px; }
                 h2 { font-size: 1.1em; }
                 .chat-box { height: 250px; }
                 input[type="text"], input[type="submit"] { font-size: 16px; } /* Prevents zoom on iOS */
+                .feedback-content { margin: 5% auto; width: 95%; }
             }
             </style>
         </head>
         <body>
             <div class="container">
                 <h2>🎓 SMART SCHOOL ASSISTANT - Attendance • Weather • News • More!</h2>
+                
+                {% if should_ask_feedback %}
+                <div class="feedback-prompt">
+                    <strong>💭 Quick Feedback:</strong> {{ feedback_prompt }}
+                    <button class="feedback-btn" onclick="showFeedbackModal()">Rate Previous Response</button>
+                </div>
+                {% endif %}
+                
                 <form method="post" id="chatForm">
                     <div class="sample-prompt">Try: "John's attendance" | "Latest news" | "Tell me a joke"</div>
                     <input name="user_input" type="text" placeholder="Ask about attendance, news, or anything!" required id="userInput">
@@ -574,7 +638,34 @@ def index():
                 <div class="chat-box">{{chat_history_html|safe}}</div>
             </div>
             
+            <!-- Feedback Modal -->
+            <div id="feedbackModal" class="feedback-modal">
+                <div class="feedback-content">
+                    <span class="close" onclick="closeFeedbackModal()">&times;</span>
+                    <h3>📝 How was my response?</h3>
+                    <p>Please rate the helpfulness of my previous answer:</p>
+                    
+                    <div class="rating-stars" id="ratingStars">
+                        <span class="star" data-rating="1">★</span>
+                        <span class="star" data-rating="2">★</span>
+                        <span class="star" data-rating="3">★</span>
+                        <span class="star" data-rating="4">★</span>
+                        <span class="star" data-rating="5">★</span>
+                    </div>
+                    
+                    <textarea class="feedback-textarea" id="feedbackText" placeholder="Optional: Tell me how I can improve my responses..."></textarea>
+                    
+                    <div style="text-align: center;">
+                        <button class="feedback-submit" onclick="submitFeedback()">Submit Feedback</button>
+                        <button class="feedback-skip" onclick="closeFeedbackModal()">Skip</button>
+                    </div>
+                </div>
+            </div>
+            
             <script>
+            let selectedRating = 0;
+            let lastInteractionId = null;
+            
             document.getElementById('chatForm').addEventListener('submit', function(e) {
                 // Show loading spinner
                 document.getElementById('loadingContainer').style.display = 'block';
@@ -625,10 +716,111 @@ def index():
                     }, 1000);
                 }
             });
+            
+            // Feedback Modal Functions
+            function showFeedbackModal() {
+                document.getElementById('feedbackModal').style.display = 'block';
+            }
+            
+            function closeFeedbackModal() {
+                document.getElementById('feedbackModal').style.display = 'none';
+                resetFeedbackForm();
+            }
+            
+            function resetFeedbackForm() {
+                selectedRating = 0;
+                document.querySelectorAll('.star').forEach(star => {
+                    star.classList.remove('selected');
+                });
+                document.getElementById('feedbackText').value = '';
+            }
+            
+            // Star rating functionality
+            document.querySelectorAll('.star').forEach(star => {
+                star.addEventListener('click', function() {
+                    selectedRating = parseInt(this.getAttribute('data-rating'));
+                    updateStarDisplay();
+                });
+                
+                star.addEventListener('mouseover', function() {
+                    const rating = parseInt(this.getAttribute('data-rating'));
+                    highlightStars(rating);
+                });
+            });
+            
+            document.getElementById('ratingStars').addEventListener('mouseleave', function() {
+                updateStarDisplay();
+            });
+            
+            function highlightStars(rating) {
+                document.querySelectorAll('.star').forEach((star, index) => {
+                    if (index < rating) {
+                        star.style.color = '#ffd700';
+                    } else {
+                        star.style.color = '#ddd';
+                    }
+                });
+            }
+            
+            function updateStarDisplay() {
+                document.querySelectorAll('.star').forEach((star, index) => {
+                    if (index < selectedRating) {
+                        star.classList.add('selected');
+                        star.style.color = '#ffd700';
+                    } else {
+                        star.classList.remove('selected');
+                        star.style.color = '#ddd';
+                    }
+                });
+            }
+            
+            async function submitFeedback() {
+                if (selectedRating === 0) {
+                    alert('Please select a rating before submitting.');
+                    return;
+                }
+                
+                const feedbackText = document.getElementById('feedbackText').value.trim();
+                
+                try {
+                    const response = await fetch('/api/feedback/submit', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            rating: selectedRating,
+                            feedback_text: feedbackText,
+                            session_id: 'web_session_' + Date.now()
+                        })
+                    });
+                    
+                    const result = await response.json();
+                    
+                    if (result.success) {
+                        alert('Thank you for your feedback! 🙏');
+                        closeFeedbackModal();
+                    } else {
+                        alert('Failed to submit feedback. Please try again.');
+                    }
+                } catch (error) {
+                    console.error('Error submitting feedback:', error);
+                    alert('Error submitting feedback. Please try again.');
+                }
+            }
+            
+            // Close modal when clicking outside
+            window.onclick = function(event) {
+                const modal = document.getElementById('feedbackModal');
+                if (event.target === modal) {
+                    closeFeedbackModal();
+                }
+            }
             </script>
         </body>
         </html>
-        """, assistant_text=assistant_text, chat_history_html=chat_history_html)
+        """, assistant_text=assistant_text, chat_history_html=chat_history_html, 
+            should_ask_feedback=should_ask_feedback, feedback_prompt=feedback_prompt)
     
     except Exception as e:
         logger.error(f"Error in index route: {e}")
@@ -887,6 +1079,48 @@ def api_conversations():
             "code": "FETCH_ERROR"
         }), 500
 
+@app.route("/api/feedback/submit", methods=["POST"])
+def submit_feedback():
+    """Submit user feedback"""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"success": False, "error": "No data provided"}), 400
+        
+        rating = data.get('rating')
+        feedback_text = data.get('feedback_text', '')
+        session_id = data.get('session_id')
+        
+        if not rating or rating < 1 or rating > 5:
+            return jsonify({"success": False, "error": "Valid rating (1-5) required"}), 400
+        
+        # Get the most recent interaction for this session
+        # In a real implementation, you'd track interaction IDs more precisely
+        interaction_id = enhanced_feedback.log_interaction(
+            user_question="Previous interaction feedback",
+            ai_response="Feedback collection",
+            query_type="feedback",
+            session_id=session_id
+        )
+        
+        # Submit feedback
+        feedback_id = enhanced_feedback.collect_feedback(
+            interaction_id=interaction_id,
+            overall_rating=rating,
+            feedback_text=feedback_text,
+            user_ip=request.remote_addr
+        )
+        
+        return jsonify({
+            "success": True,
+            "feedback_id": feedback_id,
+            "message": "Thank you for your feedback!"
+        })
+        
+    except Exception as e:
+        logger.error(f"Error submitting feedback: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
 # -----------------------
 # S3 Bucket Creation (Run once)
 # -----------------------
@@ -908,10 +1142,17 @@ def create_conversation_bucket():
         except Exception as e:
             print(f"Error creating bucket '{conversation_bucket}': {e}")
 
+# Initialize analytics dashboard
+add_analytics_to_app(app, enhanced_feedback)
+
 # Starts the web server when this file is run directly (not imported)
 if __name__ == "__main__":
     # Create conversation bucket if it doesn't exist
     create_conversation_bucket()
+    
+    print("🚀 School Chatbot with Enhanced Feedback System")
+    print("📊 Analytics Dashboard: http://localhost:7860/admin/dashboard")
+    print("🔗 Main Chat: http://localhost:7860/")
     
     port = int(os.environ.get("PORT", 7860))
     app.run(host="0.0.0.0", port=port, debug=False)
