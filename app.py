@@ -617,7 +617,7 @@ def index():
         </head>
         <body>
             <div class="container">
-                <h2>🎓 SMART SCHOOL ASSISTANT - Attendance • Weather • News • More!</h2>
+                <h2>🎓 SMART SCHOOL ASSISTANT - Attendance</h2>
                 
                 <!-- Always show feedback button for testing -->
                 <div class="feedback-prompt">
