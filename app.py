@@ -6,6 +6,7 @@ import time
 import logging
 import requests
 import re
+import sqlite3
 from datetime import datetime
 from functools import wraps
 from flask import Flask, request, render_template_string, session, jsonify
@@ -1094,6 +1095,168 @@ def submit_feedback():
     except Exception as e:
         logger.error(f"Error submitting feedback: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
+
+# -----------------------
+# ADMIN DASHBOARD ROUTES
+# -----------------------
+
+@app.route("/admin")
+@app.route("/admin/")
+def admin_dashboard():
+    """Admin dashboard to view all user interactions"""
+    try:
+        conn = sqlite3.connect("school_feedback.db")
+        cursor = conn.cursor()
+        
+        # Get total stats
+        cursor.execute('SELECT COUNT(*) FROM interactions')
+        total_interactions = cursor.fetchone()[0] if cursor.fetchone() else 0
+        
+        cursor.execute('SELECT COUNT(*) FROM feedback')
+        total_feedback = cursor.fetchone()[0] if cursor.fetchone() else 0
+        
+        cursor.execute('SELECT AVG(rating) FROM feedback')
+        avg_rating = cursor.fetchone()[0] or 0
+        
+        # Get recent interactions
+        cursor.execute('''
+            SELECT i.*, f.rating, f.feedback_text
+            FROM interactions i
+            LEFT JOIN feedback f ON i.id = f.interaction_id
+            ORDER BY i.timestamp DESC
+            LIMIT 20
+        ''')
+        
+        interactions = []
+        for row in cursor.fetchall():
+            interactions.append({
+                'id': row[0],
+                'timestamp': row[1],
+                'user_question': row[2],
+                'ai_response': row[3],
+                'query_type': row[4],
+                'response_time_ms': row[5],
+                'session_id': row[6],
+                'user_ip': row[7],
+                'rating': row[9] if len(row) > 9 else None,
+                'feedback_text': row[10] if len(row) > 10 else None
+            })
+        
+        conn.close()
+        
+        return render_template_string('''
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Admin Dashboard - School Chatbot</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; color: #333; }
+        .header { background: #2c3e50; color: white; padding: 1rem 2rem; }
+        .header h1 { font-size: 1.5rem; margin-bottom: 0.5rem; }
+        .nav a { color: #ecf0f1; text-decoration: none; margin-right: 1rem; padding: 0.5rem; border-radius: 4px; }
+        .nav a:hover { background: #34495e; }
+        .container { max-width: 1200px; margin: 2rem auto; padding: 0 1rem; }
+        .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+        .stat-card { background: white; padding: 1.5rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); text-align: center; }
+        .stat-card h3 { font-size: 2rem; color: #3498db; margin-bottom: 0.5rem; }
+        .interaction { background: white; margin-bottom: 1rem; border-radius: 8px; padding: 1.5rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .interaction-header { display: flex; justify-content: space-between; margin-bottom: 1rem; }
+        .timestamp { color: #7f8c8d; font-weight: bold; }
+        .query-type { background: #3498db; color: white; padding: 0.3rem 0.8rem; border-radius: 20px; font-size: 0.85rem; }
+        .user-question { background: #e74c3c; color: white; padding: 1rem; border-radius: 8px; margin: 0.5rem 0; }
+        .ai-response { background: #27ae60; color: white; padding: 1rem; border-radius: 8px; margin: 0.5rem 0; }
+        .meta { display: flex; gap: 1rem; font-size: 0.9rem; color: #7f8c8d; margin-top: 0.5rem; }
+        .rating { color: #f39c12; font-weight: bold; }
+        .refresh-btn { position: fixed; bottom: 2rem; right: 2rem; background: #27ae60; color: white; border: none; padding: 1rem; border-radius: 50px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🎓 Admin Dashboard - School Chatbot</h1>
+        <div class="nav">
+            <a href="/admin">Dashboard</a>
+            <a href="/">← Back to Chat</a>
+        </div>
+    </div>
+    
+    <div class="container">
+        <div class="stats">
+            <div class="stat-card">
+                <h3>{{ total_interactions }}</h3>
+                <p>Total Interactions</p>
+            </div>
+            <div class="stat-card">
+                <h3>{{ total_feedback }}</h3>
+                <p>Total Feedback</p>
+            </div>
+            <div class="stat-card">
+                <h3>{{ "%.1f"|format(avg_rating) }}/5</h3>
+                <p>Average Rating</p>
+            </div>
+        </div>
+        
+        <h2 style="margin-bottom: 1rem;">Recent User Interactions</h2>
+        
+        {% for interaction in interactions %}
+        <div class="interaction">
+            <div class="interaction-header">
+                <span class="timestamp">{{ interaction.timestamp }}</span>
+                <span class="query-type">{{ interaction.query_type or 'general' }}</span>
+            </div>
+            
+            <div class="user-question">
+                <strong>👤 USER:</strong> {{ interaction.user_question }}
+            </div>
+            
+            <div class="ai-response">
+                <strong>🤖 AI:</strong> {{ interaction.ai_response[:300] }}{% if interaction.ai_response|length > 300 %}...{% endif %}
+            </div>
+            
+            {% if interaction.feedback_text %}
+            <div style="background: #f39c12; color: white; padding: 1rem; border-radius: 8px; margin: 0.5rem 0;">
+                <strong>💭 FEEDBACK:</strong> {{ interaction.feedback_text }}
+            </div>
+            {% endif %}
+            
+            <div class="meta">
+                <span>IP: {{ interaction.user_ip or 'Unknown' }}</span>
+                <span>Response: {{ interaction.response_time_ms or 0 }}ms</span>
+                {% if interaction.rating %}
+                <span class="rating">Rating: {{ interaction.rating }}/5 ⭐</span>
+                {% endif %}
+                <span>ID: {{ interaction.id[:8] if interaction.id else 'N/A' }}</span>
+            </div>
+        </div>
+        {% endfor %}
+        
+        {% if not interactions %}
+        <div style="background: white; padding: 2rem; text-align: center; border-radius: 8px;">
+            <h3>No interactions found</h3>
+            <p>User interactions will appear here once people start using the chatbot.</p>
+        </div>
+        {% endif %}
+    </div>
+    
+    <button class="refresh-btn" onclick="location.reload()" title="Refresh Data">🔄</button>
+    
+    <script>
+        // Auto-refresh every 30 seconds
+        setInterval(() => location.reload(), 30000);
+    </script>
+</body>
+</html>
+        ''', 
+        total_interactions=total_interactions,
+        total_feedback=total_feedback, 
+        avg_rating=avg_rating,
+        interactions=interactions)
+        
+    except Exception as e:
+        logger.error(f"Admin dashboard error: {e}")
+        return f"Admin dashboard error: {e}", 500
 
 # -----------------------
 # S3 Bucket Creation (Run once)
