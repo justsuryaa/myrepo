@@ -1110,13 +1110,16 @@ def admin_dashboard():
         
         # Get total stats
         cursor.execute('SELECT COUNT(*) FROM interactions')
-        total_interactions = cursor.fetchone()[0] if cursor.fetchone() else 0
+        result = cursor.fetchone()
+        total_interactions = result[0] if result else 0
         
         cursor.execute('SELECT COUNT(*) FROM feedback')
-        total_feedback = cursor.fetchone()[0] if cursor.fetchone() else 0
+        result = cursor.fetchone()
+        total_feedback = result[0] if result else 0
         
         cursor.execute('SELECT AVG(rating) FROM feedback')
-        avg_rating = cursor.fetchone()[0] or 0
+        result = cursor.fetchone()
+        avg_rating = result[0] if result else 0
         
         # Get recent interactions
         cursor.execute('''
