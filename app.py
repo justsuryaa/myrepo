@@ -1153,18 +1153,20 @@ def admin_dashboard():
                     ''')
                 
                 for row in cursor.fetchall():
-            interactions.append({
-                'id': row[0],
-                'timestamp': row[1],
-                'user_question': row[2],
-                'ai_response': row[3],
-                'query_type': row[4],
-                'response_time_ms': row[5],
-                'session_id': row[6],
-                'user_ip': row[7],
-                'rating': row[9] if len(row) > 9 else None,
-                'feedback_text': row[10] if len(row) > 10 else None
-            })
+                    if row and len(row) >= 6:  # Ensure row exists and has minimum columns
+                        interactions.append({
+                            'id': row[0] or 'N/A',
+                            'timestamp': row[1] or 'Unknown',
+                            'user_question': row[2] or 'No question',
+                            'ai_response': row[3] or 'No response',
+                            'query_type': row[4] or 'unknown',
+                            'response_time_ms': row[5] or 0,
+                            'rating': row[6] if len(row) > 6 and row[6] else None,
+                            'feedback_text': row[7] if len(row) > 7 and row[7] else None
+                        })
+            except Exception as e:
+                logger.error(f"Error querying interactions: {e}")
+                # Continue with empty interactions list
         
         conn.close()
         
