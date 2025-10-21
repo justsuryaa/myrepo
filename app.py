@@ -1108,30 +1108,51 @@ def admin_dashboard():
         conn = sqlite3.connect("school_feedback.db")
         cursor = conn.cursor()
         
-        # Get total stats
-        cursor.execute('SELECT COUNT(*) FROM interactions')
-        result = cursor.fetchone()
-        total_interactions = result[0] if result else 0
+        # Check if tables exist first
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
+        tables = [row[0] for row in cursor.fetchall()]
         
-        cursor.execute('SELECT COUNT(*) FROM feedback')
-        result = cursor.fetchone()
-        total_feedback = result[0] if result else 0
+        # Initialize with default values
+        total_interactions = 0
+        total_feedback = 0
+        avg_rating = 0.0
         
-        cursor.execute('SELECT AVG(rating) FROM feedback')
-        result = cursor.fetchone()
-        avg_rating = result[0] if result else 0
+        # Get stats only if tables exist
+        if 'interactions' in tables:
+            cursor.execute('SELECT COUNT(*) FROM interactions')
+            result = cursor.fetchone()
+            total_interactions = result[0] if result and result[0] is not None else 0
         
-        # Get recent interactions
-        cursor.execute('''
-            SELECT i.*, f.rating, f.feedback_text
-            FROM interactions i
-            LEFT JOIN feedback f ON i.id = f.interaction_id
-            ORDER BY i.timestamp DESC
-            LIMIT 20
-        ''')
+        if 'feedback' in tables:
+            cursor.execute('SELECT COUNT(*) FROM feedback')
+            result = cursor.fetchone()
+            total_feedback = result[0] if result and result[0] is not None else 0
+            
+            cursor.execute('SELECT AVG(rating) FROM feedback WHERE rating IS NOT NULL')
+            result = cursor.fetchone()
+            avg_rating = round(result[0], 2) if result and result[0] is not None else 0.0
         
+        # Get recent interactions (only if tables exist)
         interactions = []
-        for row in cursor.fetchall():
+        if 'interactions' in tables:
+            try:
+                if 'feedback' in tables:
+                    cursor.execute('''
+                        SELECT i.id, i.timestamp, i.user_question, i.ai_response, i.query_type, i.response_time_ms, f.rating, f.feedback_text
+                        FROM interactions i
+                        LEFT JOIN feedback f ON i.id = f.interaction_id
+                        ORDER BY i.timestamp DESC
+                        LIMIT 20
+                    ''')
+                else:
+                    cursor.execute('''
+                        SELECT id, timestamp, user_question, ai_response, query_type, response_time_ms, NULL, NULL
+                        FROM interactions
+                        ORDER BY timestamp DESC
+                        LIMIT 20
+                    ''')
+                
+                for row in cursor.fetchall():
             interactions.append({
                 'id': row[0],
                 'timestamp': row[1],
