@@ -1234,11 +1234,25 @@ def admin_dashboard():
             </div>
             
             <div class="user-question">
-                <strong>👤 USER:</strong> {{ interaction.user_question }}
+                <strong>👤 USER:</strong>
+                <div class="text-block">
+                    <span class="short-text">{{ interaction.user_question[:200] }}{% if interaction.user_question|length > 200 %}...{% endif %}</span>
+                    {% if interaction.user_question|length > 200 %}
+                    <a href="#" class="toggle-link" onclick="toggleText(event, 'uq-{{ loop.index }}')">Show more</a>
+                    <div id="uq-{{ loop.index }}" class="full-text" style="display:none; margin-top:0.6rem;">{{ interaction.user_question }}</div>
+                    {% endif %}
+                </div>
             </div>
-            
+
             <div class="ai-response">
-                <strong>🤖 AI:</strong> {{ interaction.ai_response[:300] }}{% if interaction.ai_response|length > 300 %}...{% endif %}
+                <strong>🤖 AI:</strong>
+                <div class="text-block">
+                    <span class="short-text">{{ interaction.ai_response[:300] }}{% if interaction.ai_response|length > 300 %}...{% endif %}</span>
+                    {% if interaction.ai_response|length > 300 %}
+                    <a href="#" class="toggle-link" onclick="toggleText(event, 'ai-{{ loop.index }}')">Show more</a>
+                    <div id="ai-{{ loop.index }}" class="full-text" style="display:none; margin-top:0.6rem;">{{ interaction.ai_response }}</div>
+                    {% endif %}
+                </div>
             </div>
             
             {% if interaction.feedback_text %}
@@ -1271,6 +1285,19 @@ def admin_dashboard():
     <script>
         // Auto-refresh every 30 seconds
         setInterval(() => location.reload(), 30000);
+        // Toggle full/short text for long fields
+        function toggleText(e, id) {
+            e.preventDefault();
+            const el = document.getElementById(id);
+            if (!el) return;
+            if (el.style.display === 'none') {
+                el.style.display = 'block';
+                e.target.textContent = 'Show less';
+            } else {
+                el.style.display = 'none';
+                e.target.textContent = 'Show more';
+            }
+        }
     </script>
 </body>
 </html>
